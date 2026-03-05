@@ -15,19 +15,11 @@ const devicePerformance = {
 const isHighPerformance = devicePerformance.memory >= 6 && devicePerformance.cores >= 6;
 const isMidPerformance = devicePerformance.memory >= 4 && devicePerformance.cores >= 4;
 
-// iOS Safari specific optimizations
+// iOS Safari specific optimizations - only for animations
 if (isIOS) {
-  // Prevent elastic scrolling on body
-  document.body.style.position = 'fixed';
-  document.body.style.width = '100%';
-  document.body.style.height = '100%';
-  document.body.style.overflow = 'hidden';
-  
-  // Force GPU acceleration on iOS
+  // Force GPU acceleration on iOS for smoother animations
   document.body.style.transform = 'translate3d(0, 0, 0)';
   document.body.style.webkitTransform = 'translate3d(0, 0, 0)';
-  
-  // Force hardware acceleration for smoother animations
   document.body.style.webkitBackfaceVisibility = 'hidden';
   document.body.style.webkitPerspective = '1000';
 }

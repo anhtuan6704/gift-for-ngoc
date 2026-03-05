@@ -4,6 +4,12 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
   min-height: 100vh;
   display: flex;
@@ -22,6 +28,8 @@ body {
   animation: gradientBG 15s ease infinite;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes gradientBG {
@@ -207,13 +215,11 @@ body::before {
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}\n\n.overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n@media (max-width: 480px) {\n  .overlay {\n    background: rgba(0, 0, 0, 0.5);\n    /* Reduce blur on mobile for better performance */\n    backdrop-filter: blur(6px);\n    -webkit-backdrop-filter: blur(6px);\n    /* Fast transition */\n    transition: opacity 0.2s ease, visibility 0.2s ease;\n  }\n}
 
 .letter-modal {
   background: rgba(255, 255, 255, 0.7);
@@ -258,7 +264,7 @@ body::before {
   right: 15px;
   width: 40px;
   height: 40px;
-  background: rgba(216, 27, 96, 0.8);
+  background: rgba(216, 27, 96, 0.9);
   color: white;
   border: none;
   border-radius: 50%;
@@ -270,11 +276,29 @@ body::before {
   z-index: 100;
   transition: all 0.3s ease;
   backdrop-filter: blur(5px);
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3);
 }
 
 .close-btn:hover {
   background: #d81b60;
   transform: rotate(90deg) scale(1.1);
+}
+
+.close-btn:active {
+  transform: scale(0.9);
+  box-shadow: 0 2px 8px rgba(216, 27, 96, 0.4);
+}
+
+@media (max-width: 480px) {
+  .close-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 24px;
+    top: 10px;
+    right: 10px;
+    background: rgba(216, 27, 96, 0.95);
+  }
 }
 
 .letter-content {
@@ -614,16 +638,15 @@ body::before {
   box-shadow:
     0 25px 50px -12px rgba(216, 27, 96, 0.2),
     0 0 0 8px rgba(255, 255, 255, 0.4);
-  transform: translateY(50px) scale(0.9);
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateY(30px) scale(0.95);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-
-.overlay.active .image-modal {
-  transform: translateY(0) scale(1);
-}
+  overflow: hidden;
+  max-height: 90vh;
+  will-change: transform;
+}\n\n.overlay.active .image-modal {\n  transform: translateY(0) scale(1);\n}\n\n@media (max-width: 480px) {\n  .image-modal {\n    /* Lighter blur on mobile */\n    backdrop-filter: blur(15px);\n    -webkit-backdrop-filter: blur(15px);\n    /* Faster, simpler transition */\n    transform: translateY(20px);\n    transition: transform 0.25s ease-out;\n  }\n  \n  .overlay.active .image-modal {\n    transform: translateY(0);\n  }\n}
 
 .gallery-container {
   display: flex;
@@ -632,16 +655,55 @@ body::before {
   width: 100%;
   overflow: hidden;
   cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  touch-action: pan-y;
+  position: relative;
+  flex: 1;
+  /* Optimize container rendering */
+  contain: layout style;
+  isolation: isolate;
 }
 
 .gallery-container:active {
   cursor: grabbing;
 }
 
+@media (max-width: 480px) {
+  .gallery-container {
+    cursor: default;
+    /* Enable hardware acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+  
+  .gallery-container:active {
+    cursor: default;
+  }
+}
+
 .gallery-row {
   display: flex;
   width: max-content;
   pointer-events: auto;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  contain: layout style paint;
+  content-visibility: auto;
+}
+
+@media (max-width: 480px) {
+  .gallery-row {
+    /* Force compositing layer on mobile */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
 }
 
 .gallery-row img {
@@ -649,11 +711,30 @@ body::before {
   width: 150px;
   object-fit: cover;
   border-radius: 16px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-  border: 4px solid white;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 3px solid white;
   cursor: pointer;
   margin-right: 20px;
+  -webkit-tap-highlight-color: transparent;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  pointer-events: auto;
+  contain: layout style paint;
+  /* Use filter instead of box-shadow for better performance */
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.08));
+  -webkit-filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.08));
+}
+
+@media (max-width: 480px) {
+  .gallery-row img {
+    transition: none;
+    image-rendering: -webkit-optimize-contrast;
+    -webkit-user-drag: none;
+    /* Lighter shadow on mobile */
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.06));
+    -webkit-filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.06));
+  }
 }
 
 .gallery-row img:hover {
@@ -664,29 +745,53 @@ body::before {
 
 .row-top {
   animation: scroll-left 30s linear infinite;
+  /* Ensure smooth animation */
+  animation-play-state: running;
 }
 
 .row-bottom {
   animation: scroll-right 30s linear infinite;
+  animation-play-state: running;
+}
+
+/* Optimized timing for mobile - 20s is sweet spot for smooth 60fps */
+@media (max-width: 480px) {
+  .row-top {
+    animation: scroll-left 20s linear infinite;
+  }
+
+  .row-bottom {
+    animation: scroll-right 20s linear infinite;
+  }
+}
+
+@media (max-width: 768px) and (min-width: 481px) {
+  .row-top {
+    animation: scroll-left 25s linear infinite;
+  }
+
+  .row-bottom {
+    animation: scroll-right 25s linear infinite;
+  }
 }
 
 @keyframes scroll-left {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
 @keyframes scroll-right {
   0% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 
   100% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -697,6 +802,8 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 #lightbox-img {
@@ -705,42 +812,176 @@ body::before {
   border-radius: 8px;
   box-shadow: 0 5px 30px rgba(0, 0, 0, 0.5);
   border: 5px solid white;
+  object-fit: contain;
+  transition: opacity 0.3s ease;
 }
 
-@media (max-width: 480px) {
+#lightbox-img.loading {
+  opacity: 0.5;
+}
+
+/* Tablet and Medium Screens */
+@media (max-width: 768px) {
   .image-modal {
-    height: 500px;
+    height: 70vh;
+    max-height: 650px;
+    padding: 35px 18px;
+    width: 95%;
+  }
+
+  .gallery-container {
+    gap: 24px;
   }
 
   .gallery-row img {
-    height: 140px;
-    width: 110px;
+    height: 210px;
+    width: 158px;
+    border-radius: 15px;
+    border: 3px solid white;
+    margin-right: 15px;
+  }
+}
+
+/* Mobile Phones */
+@media (max-width: 480px) {
+  .image-modal {
+    height: 75vh;
+    max-height: 600px;
+    min-height: 500px;
+    padding: 50px 12px 30px;
+    width: 96%;
+    border-radius: 25px;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    /* Optimize modal rendering */
+    contain: layout style;
+  }
+
+  .gallery-container {
+    gap: 22px;
+  }
+
+  .gallery-row img {
+    height: 195px;
+    width: 146px;
+    border-radius: 14px;
+    border: 3px solid white;
+    margin-right: 14px;
+  }
+
+  .gallery-row img:hover {
+    transform: none;
   }
 
   .gallery-gif-wrapper.top {
-    top: 5px;
-    left: 5px;
+    top: 8px;
+    left: 8px;
+    gap: 10px;
   }
 
   .gallery-gif-wrapper.bottom {
-    bottom: 5px;
-    right: 5px;
+    bottom: 8px;
+    right: 8px;
+    gap: 10px;
   }
 
   .gallery-gif {
-    width: 40px !important;
+    width: 50px !important;
   }
 
   .gallery-gif-wrapper.bottom .gallery-gif {
-    width: 100px !important;
+    width: 70px !important;
   }
 
   .gallery-gif-wrapper.top .gallery-gif {
-    width: 100px !important;
+    width: 70px !important;
   }
 
   .flying-text {
-    font-size: 0.8rem !important;
+    font-size: 0.65rem !important;
+    font-weight: 800;
+  }
+
+  #lightbox-img {
+    border: 3px solid white;
+    max-height: 80vh;
+    border-radius: 12px;
+  }
+
+  .lightbox-content {
+    max-width: 95%;
+    max-height: 95%;
+  }
+}
+
+/* Extra Small Phones */
+@media (max-width: 380px) {
+  .image-modal {
+    height: 70vh;
+    max-height: 550px;
+    min-height: 480px;
+    padding: 45px 10px 25px;
+    width: 98%;
+  }
+
+  .gallery-row img {
+    height: 170px;
+    width: 128px;
+    border-radius: 12px;
+    border: 2.5px solid white;
+    margin-right: 11px;
+  }
+
+  .gallery-container {
+    gap: 18px;
+  }
+
+  .gallery-gif-wrapper.top,
+  .gallery-gif-wrapper.bottom {
+    gap: 8px;
+  }
+
+  .flying-text {
+    font-size: 0.55rem !important;
+  }
+}
+
+/* Image Loading States */
+.gallery-row img {
+  background: linear-gradient(135deg, #ffd1dc, #ffafbd);
+  position: relative;
+}
+
+/* Active image on tap - minimal effect for better performance */
+.gallery-row img:active {
+  opacity: 0.9;
+  transition: opacity 0.1s ease-out;
+}
+
+@media (max-width: 480px) {
+  .gallery-row img:active {
+    opacity: 0.95;
+  }
+}
+
+/* Pause animations on touch/drag */
+.gallery-container.paused .gallery-row {
+  animation-play-state: paused !important;
+}
+
+/* Optimize rendering on scroll */
+@media (max-width: 480px) {
+  .gallery-row {
+    /* Promote to composite layer */
+    will-change: transform;
+  }
+  
+  .gallery-container:not(.paused) .gallery-row {
+    will-change: transform;
+  }
+  
+  .gallery-container.paused .gallery-row {
+    will-change: auto;
   }
 }
 
@@ -1247,5 +1488,66 @@ body::before {
     right: 15px;
     width: 45px;
     height: 45px;
+  }
+}
+
+/* Performance Optimizations for Mobile */
+@media (max-width: 480px) {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Reduce animations on low-end devices */
+  @media (prefers-reduced-motion: reduce) {
+    .gallery-row {
+      animation-duration: 40s !important;
+    }
+  }
+  
+  /* Force composite layers for smooth 60fps */
+  .image-modal {
+    will-change: transform, opacity;
+  }
+  
+  .gallery-row {
+    will-change: transform;
+  }
+  
+  /* Use CSS containment for better isolation */
+  .image-modal,
+  .gallery-container,
+  .gallery-row {
+    contain: layout style paint;
+  }
+  
+  /* Optimize scroll performance */
+  .gallery-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto; /* Disable smooth scroll for better perf */
+  }
+  
+  /* Prevent layout thrashing */
+  .overlay {
+    will-change: opacity, transform;
+  }
+  
+  /* GPU acceleration for all animations */
+  @keyframes scroll-left {
+    0% {
+      transform: translate3d(0, 0, 0);
+    }
+    100% {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+  
+  @keyframes scroll-right {
+    0% {
+      transform: translate3d(-50%, 0, 0);
+    }
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
   }
 }

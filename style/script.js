@@ -1,3 +1,20 @@
+// Detect iOS for specific optimizations
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+// iOS Safari specific optimizations
+if (isIOS) {
+  // Prevent elastic scrolling on body
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
+  document.body.style.height = '100%';
+  document.body.style.overflow = 'hidden';
+  
+  // Force GPU acceleration on iOS
+  document.body.style.transform = 'translate3d(0, 0, 0)';
+  document.body.style.webkitTransform = 'translate3d(0, 0, 0)';
+}
+
 const heartsContainer = document.body;
 const imageFiles = Array.from(
   { length: 20 },
@@ -274,69 +291,205 @@ function populateGallery() {
   galleryTop.innerHTML = "";
   galleryBottom.innerHTML = "";
 
-  const topImages = imageFiles.slice(0, 9);
-  const bottomImages = imageFiles.slice(9);
+  const isMobile = window.innerWidth <= 480;
+  const isTablet = window.innerWidth <= 768 && window.innerWidth > 480;
+  
+  // Optimal number of images for smooth scrolling
+  const topImages = isMobile ? imageFiles.slice(0, 10) : imageFiles.slice(0, 10);
+  const bottomImages = isMobile ? imageFiles.slice(10) : imageFiles.slice(10);
 
   const createImg = (src) => {
     const img = document.createElement("img");
-    img.src = src;
-    img.loading = "lazy";
-    img.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openLightbox(src);
+    img.alt = "Gallery Image";
+    img.draggable = false;
+    
+    // Force eager loading on mobile for smooth experience
+    img.loading = "eager";
+    
+    // Set src after properties for better rendering
+    requestAnimationFrame(() => {
+      img.src = src;
     });
+    
+    // Add error handling
+    img.addEventListener("error", () => {
+      img.style.display = "none";
+    }, { once: true });
+    
+    // Prevent context menu on mobile
+    if (isMobile) {
+      img.addEventListener("contextmenu", (e) => e.preventDefault(), { passive: false });
+    }
+    
+    // Click handler with passive for smooth scrolling
+    let tapStartTime;
+    img.addEventListener("touchstart", () => {
+      tapStartTime = performance.now();
+    }, { passive: true });
+    
+    img.addEventListener("touchend", (e) => {
+      const tapDuration = performance.now() - tapStartTime;
+      if (tapDuration < 200) { // Quick tap
+        e.preventDefault();
+        openLightbox(src);
+      }
+    }, { passive: false });
+    
+    img.addEventListener("click", (e) => {
+      if (!isMobile) {
+        e.stopPropagation();
+        openLightbox(src);
+      }
+    });
+    
     return img;
   };
 
-  [...topImages, ...topImages].forEach((src) =>
-    galleryTop.appendChild(createImg(src)),
-  );
-  [...bottomImages, ...bottomImages].forEach((src) =>
-    galleryBottom.appendChild(createImg(src)),
-  );
+  // Use document fragment for better performance
+  const topFragment = document.createDocumentFragment();
+  const bottomFragment = document.createDocumentFragment();
+  
+  // Duplicate for seamless loop
+  for (let i = 0; i < 2; i++) {
+    topImages.forEach((src) => topFragment.appendChild(createImg(src)));
+  }
+  for (let i = 0; i < 2; i++) {
+    bottomImages.forEach((src) => bottomFragment.appendChild(createImg(src)));
+  }
+  
+  // Use RAF for smooth rendering
+  requestAnimationFrame(() => {
+    galleryTop.appendChild(topFragment);
+    galleryBottom.appendChild(bottomFragment);
+    
+    // Force reflow for iOS Safari
+    if (isIOS) {
+      void galleryTop.offsetHeight;
+      void galleryBottom.offsetHeight;
+    }
+  });
 }
 
 function openLightbox(src) {
+  lightboxImg.classList.add('loading');
   lightboxImg.src = src;
+  lightboxImg.onload = () => {
+    lightboxImg.classList.remove('loading');
+  };
   lightboxOverlay.classList.add("active");
+  
+  // Prevent body scroll on mobile
+  if (window.innerWidth <= 480) {
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeLightboxFunc() {
+  lightboxOverlay.classList.remove("active");
+  document.body.style.overflow = '';
 }
 
 closeLightbox.addEventListener("click", () => {
-  lightboxOverlay.classList.remove("active");
+  closeLightboxFunc();
 });
 
 lightboxOverlay.addEventListener("click", (e) => {
-  if (e.target === lightboxOverlay) lightboxOverlay.classList.remove("active");
+  if (e.target === lightboxOverlay) closeLightboxFunc();
 });
 
 function makeDraggable(element) {
   let isDown = false;
-  let startX;
-  let scrollLeft;
+  let touchStartTime;
+  let animationFrameId;
 
+  const pauseAnimations = () => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(() => {
+      element.classList.add('paused');
+      const rows = element.querySelectorAll('.gallery-row');
+      rows.forEach(row => {
+        row.style.animationPlayState = 'paused';
+      });
+    });
+  };
+
+  const resumeAnimations = () => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(() => {
+      element.classList.remove('paused');
+      const rows = element.querySelectorAll('.gallery-row');
+      rows.forEach(row => {
+        row.style.animationPlayState = 'running';
+      });
+    });
+  };
+
+  // Mouse events
   element.addEventListener("mousedown", (e) => {
     isDown = true;
     element.style.cursor = "grabbing";
-    element.querySelector(".gallery-row").style.animationPlayState = "paused";
+    pauseAnimations();
   });
 
   window.addEventListener("mouseup", () => {
-    isDown = false;
-    element.style.cursor = "grab";
-    const row = element.querySelector(".gallery-row");
-    if (row) row.style.animationPlayState = "running";
+    if (isDown) {
+      isDown = false;
+      element.style.cursor = "grab";
+      resumeAnimations();
+    }
   });
 
   element.addEventListener("mouseleave", () => {
-    isDown = false;
-    const row = element.querySelector(".gallery-row");
-    if (row) row.style.animationPlayState = "running";
+    if (isDown) {
+      isDown = false;
+      resumeAnimations();
+    }
   });
+
+  // Touch events - ultra smooth
+  element.addEventListener("touchstart", (e) => {
+    touchStartTime = performance.now();
+    pauseAnimations();
+  }, { passive: true });
+
+  element.addEventListener("touchend", () => {
+    const touchDuration = performance.now() - touchStartTime;
+    // Instant resume for quick taps
+    if (touchDuration < 200) {
+      resumeAnimations();
+    } else {
+      setTimeout(resumeAnimations, 100);
+    }
+  }, { passive: true });
+
+  element.addEventListener("touchcancel", () => {
+    resumeAnimations();
+  }, { passive: true });
 }
 
 btnImage.addEventListener("click", () => {
-  populateGallery();
-  imageOverlay.classList.add("active");
+  // Use RAF for smooth transition
+  requestAnimationFrame(() => {
+    populateGallery();
+    
+    requestAnimationFrame(() => {
+      imageOverlay.classList.add("active");
+      
+      // Enable touch interactions
+      const galleryContainer = document.querySelector('.gallery-container');
+      if (galleryContainer) {
+        makeDraggable(galleryContainer);
+      }
+      
+      // Force composite layers on mobile for smooth animation
+      if (window.innerWidth <= 480) {
+        const rows = document.querySelectorAll('.gallery-row');
+        rows.forEach(row => {
+          row.style.transform = 'translateZ(0)';
+        });
+      }
+    });
+  });
 });
 
 const btnGift = document.getElementById("btn-gift");
@@ -388,6 +541,14 @@ document.addEventListener("fullscreenchange", () => {
 
 closeImage.addEventListener("click", () => {
   imageOverlay.classList.remove("active");
+  document.body.style.overflow = '';
+});
+
+imageOverlay.addEventListener("click", (e) => {
+  if (e.target === imageOverlay) {
+    imageOverlay.classList.remove("active");
+    document.body.style.overflow = '';
+  }
 });
 
 btnMusic.addEventListener("click", () => musicOverlay.classList.add("active"));
@@ -524,5 +685,107 @@ if (resetLockBtn) {
   });
 }
 
+// Performance optimizations for mobile
+if (window.innerWidth <= 480) {
+  // Optimize rendering
+  document.body.style.setProperty('pointer-events', 'auto');
+  
+  // Force hardware acceleration on key elements
+  const style = document.createElement('style');
+  style.textContent = `
+    @media (max-width: 480px) {
+      .gallery-row {
+        transform: translate3d(0, 0, 0) !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Optimize viewport on orientation change
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => window.scrollTo(0, 1), 100);
+  }, { passive: true });
+  
+  // Aggressive image preloading for smooth experience
+  setTimeout(() => {
+    const fragment = document.createDocumentFragment();
+    imageFiles.forEach(src => {
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.href = src;
+      fragment.appendChild(link);
+    });
+    document.head.appendChild(fragment);
+  }, 1000);
+  
+  // Disable momentum scrolling on iOS for gallery
+  if (isIOS) {
+    document.addEventListener('DOMContentLoaded', () => {
+      const overlays = document.querySelectorAll('.overlay');
+      overlays.forEach(overlay => {
+        overlay.style.webkitOverflowScrolling = 'auto';
+      });
+    });
+  }
+}
 
+// Throttle function for performance
+function throttle(func, delay) {
+  let lastCall = 0;
+  return function(...args) {
+    const now = performance.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      return func(...args);
+    }
+  };
+}
+
+// Debounce function for resize events
+function debounce(func, delay) {
+  let timeoutId;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+// Optimize scroll performance
+if ('scrollBehavior' in document.documentElement.style) {
+  document.documentElement.style.scrollBehavior = 'smooth';
+}
+
+// Detect device performance tier
+const getDevicePerformance = () => {
+  const memory = navigator.deviceMemory || 4; // GB
+  const cores = navigator.hardwareConcurrency || 2;
+  
+  if (memory >= 6 && cores >= 6) return 'high';
+  if (memory >= 4 && cores >= 4) return 'medium';
+  return 'low';
+};
+
+// Adjust animation speed based on device performance
+if (window.innerWidth <= 480) {
+  const perfTier = getDevicePerformance();
+  document.addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style');
+    if (perfTier === 'low') {
+      style.textContent = `
+        @media (max-width: 480px) {
+          .row-top { animation-duration: 25s !important; }
+          .row-bottom { animation-duration: 25s !important; }
+        }
+      `;
+    } else if (perfTier === 'medium') {
+      style.textContent = `
+        @media (max-width: 480px) {
+          .row-top { animation-duration: 22s !important; }
+          .row-bottom { animation-duration: 22s !important; }
+        }
+      `;
+    }
+    if (style.textContent) document.head.appendChild(style);
+  });
+}
 

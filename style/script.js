@@ -2,6 +2,19 @@
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+// Performance monitoring for adaptive optimization
+const devicePerformance = {
+  isMobile: window.innerWidth <= 480,
+  isTablet: window.innerWidth > 480 && window.innerWidth <= 768,
+  memory: navigator.deviceMemory || 4,
+  cores: navigator.hardwareConcurrency || 2,
+  connection: navigator.connection?.effectiveType || '4g'
+};
+
+// Detect high-performance device
+const isHighPerformance = devicePerformance.memory >= 6 && devicePerformance.cores >= 6;
+const isMidPerformance = devicePerformance.memory >= 4 && devicePerformance.cores >= 4;
+
 // iOS Safari specific optimizations
 if (isIOS) {
   // Prevent elastic scrolling on body
@@ -13,6 +26,10 @@ if (isIOS) {
   // Force GPU acceleration on iOS
   document.body.style.transform = 'translate3d(0, 0, 0)';
   document.body.style.webkitTransform = 'translate3d(0, 0, 0)';
+  
+  // Force hardware acceleration for smoother animations
+  document.body.style.webkitBackfaceVisibility = 'hidden';
+  document.body.style.webkitPerspective = '1000';
 }
 
 const heartsContainer = document.body;
@@ -291,23 +308,28 @@ function populateGallery() {
   const isMobile = window.innerWidth <= 480;
   const isTablet = window.innerWidth <= 768 && window.innerWidth > 480;
   
-  // Use document fragments for batch rendering - 3x faster
-  const topFragment = document.createDocumentFragment();
-  const bottomFragment = document.createDocumentFragment();
-  
   // Optimal number of images for smooth scrolling
-  const topImages = isMobile ? imageFiles.slice(0, 10) : imageFiles.slice(0, 10);
-  const bottomImages = isMobile ? imageFiles.slice(10) : imageFiles.slice(10);
+  const topImages = imageFiles.slice(0, 10);
+  const bottomImages = imageFiles.slice(10);
 
   const createImg = (src) => {
     const img = document.createElement("img");
     img.alt = "Gallery Image";
     img.draggable = false;
-    img.loading = "eager";
-    img.src = src; // Set immediately, no RAF delay
-    img.decoding = "async"; // Async decoding for smoothness
     
-    // Add error handling
+    // Force eager loading for smooth experience
+    img.loading = "eager";
+    img.decoding = "async"; // Non-blocking decode
+    
+    // Optimize image rendering
+    if (isMobile) {
+      img.style.imageRendering = "-webkit-optimize-contrast";
+    }
+    
+    // Set src immediately for faster load
+    img.src = src;
+    
+    // Error handling
     img.addEventListener("error", () => {
       img.style.display = "none";
     }, { once: true, passive: true });
@@ -317,31 +339,42 @@ function populateGallery() {
       img.addEventListener("contextmenu", (e) => e.preventDefault(), { passive: false });
     }
     
-    // Click handler with passive for smooth scrolling
+    // Optimized touch handling
     let tapStartTime;
-    img.addEventListener("touchstart", () => {
+    let tapStartY;
+    
+    img.addEventListener("touchstart", (e) => {
       tapStartTime = performance.now();
+      tapStartY = e.touches[0].clientY;
     }, { passive: true });
     
     img.addEventListener("touchend", (e) => {
       const tapDuration = performance.now() - tapStartTime;
-      if (tapDuration < 200) { // Quick tap
+      const currentY = e.changedTouches[0].clientY;
+      const moveDistance = Math.abs(currentY - tapStartY);
+      
+      // Only trigger if quick tap with minimal movement
+      if (tapDuration < 200 && moveDistance < 10) {
         e.preventDefault();
-        openLightbox(src);
+        requestAnimationFrame(() => openLightbox(src));
       }
     }, { passive: false });
     
     img.addEventListener("click", (e) => {
       if (!isMobile) {
         e.stopPropagation();
-        openLightbox(src);
+        requestAnimationFrame(() => openLightbox(src));
       }
-    });
+    }, { passive: true });
     
     return img;
   };
 
-  // Duplicate for seamless infinite loop
+  // Use document fragment for batch DOM operations
+  const topFragment = document.createDocumentFragment();
+  const bottomFragment = document.createDocumentFragment();
+  
+  // Duplicate for seamless loop
   for (let i = 0; i < 2; i++) {
     topImages.forEach((src) => topFragment.appendChild(createImg(src)));
   }
@@ -349,37 +382,18 @@ function populateGallery() {
     bottomImages.forEach((src) => bottomFragment.appendChild(createImg(src)));
   }
   
-  // Single RAF for smooth rendering
+  // Clear and append in single RAF for smooth rendering
   requestAnimationFrame(() => {
     galleryTop.innerHTML = "";
     galleryBottom.innerHTML = "";
     galleryTop.appendChild(topFragment);
     galleryBottom.appendChild(bottomFragment);
     
-    // Setup intersection observer for performance
-    setupGalleryObserver();
-  });
-}
-
-// Intersection Observer to pause animations when off-screen
-function setupGalleryObserver() {
-  if (!('IntersectionObserver' in window)) return;
-  
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-      } else {
-        entry.target.classList.remove('visible');
-      }
-    });
-  }, {
-    threshold: 0.1,
-    rootMargin: '50px'
-  });
-  
-  document.querySelectorAll('.gallery-row').forEach(row => {
-    observer.observe(row);
+    // Force composite layer on iOS
+    if (isIOS) {
+      void galleryTop.offsetHeight;
+      void galleryBottom.offsetHeight;
+    }
   });
 }
 
@@ -442,7 +456,7 @@ function makeDraggable(element) {
     isDown = true;
     element.style.cursor = "grabbing";
     pauseAnimations();
-  });
+  }, { passive: true });
 
   window.addEventListener("mouseup", () => {
     if (isDown) {
@@ -450,52 +464,61 @@ function makeDraggable(element) {
       element.style.cursor = "grab";
       resumeAnimations();
     }
-  });
+  }, { passive: true });
 
   element.addEventListener("mouseleave", () => {
     if (isDown) {
       isDown = false;
       resumeAnimations();
     }
-  });
+  }, { passive: true });
 
-  // Touch events - ultra smooth
+  // Touch events - optimized for 60fps
   element.addEventListener("touchstart", (e) => {
     touchStartTime = performance.now();
-    // Use will-change for smoother interaction
-    element.style.willChange = 'transform';
     pauseAnimations();
   }, { passive: true });
 
   element.addEventListener("touchend", () => {
     const touchDuration = performance.now() - touchStartTime;
-    // Remove will-change to free resources
-    element.style.willChange = 'auto';
-    // Instant resume for snappy feel
+    // Instant resume for quick taps (< 150ms)
     if (touchDuration < 150) {
       requestAnimationFrame(resumeAnimations);
     } else {
-      setTimeout(resumeAnimations, 50);
+      // Smooth delayed resume for long touches
+      requestAnimationFrame(() => {
+        setTimeout(resumeAnimations, 80);
+      });
     }
   }, { passive: true });
 
   element.addEventListener("touchcancel", () => {
-    element.style.willChange = 'auto';
     resumeAnimations();
   }, { passive: true });
 }
 
 btnImage.addEventListener("click", () => {
-  // Single RAF - no nesting for better performance
+  // Use RAF for smooth transition
   requestAnimationFrame(() => {
     populateGallery();
-    imageOverlay.classList.add("active");
     
-    // Enable touch interactions
-    const galleryContainer = document.querySelector('.gallery-container');
-    if (galleryContainer) {
-      makeDraggable(galleryContainer);
-    }
+    requestAnimationFrame(() => {
+      imageOverlay.classList.add("active");
+      
+      // Enable touch interactions
+      const galleryContainer = document.querySelector('.gallery-container');
+      if (galleryContainer) {
+        makeDraggable(galleryContainer);
+      }
+      
+      // Force composite layers on mobile for smooth animation
+      if (window.innerWidth <= 480) {
+        const rows = document.querySelectorAll('.gallery-row');
+        rows.forEach(row => {
+          row.style.transform = 'translateZ(0)';
+        });
+      }
+    });
   });
 });
 

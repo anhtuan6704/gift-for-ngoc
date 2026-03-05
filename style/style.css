@@ -30,10 +30,6 @@ body {
   overflow-y: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Critical mobile optimizations */
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 
 @keyframes gradientBG {
@@ -102,8 +98,8 @@ p {
 
 .menu-item {
   background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 2rem;
   padding: 2.5rem 1.5rem;
@@ -650,7 +646,7 @@ body::before {
   overflow: hidden;
   max-height: 90vh;
   will-change: transform;
-}\n\n.overlay.active .image-modal {\n  transform: translateY(0) scale(1);\n}\n\n@media (max-width: 480px) {\n  .image-modal {\n    /* Lighter blur on mobile */\n    backdrop-filter: blur(8px);\n    -webkit-backdrop-filter: blur(8px);\n    /* Faster, simpler transition */\n    transform: translateY(20px);\n    transition: transform 0.25s ease-out;\n  }\n  \n  .overlay.active .image-modal {\n    transform: translateY(0);\n  }\n}
+}\n\n.overlay.active .image-modal {\n  transform: translateY(0) scale(1);\n}\n\n@media (max-width: 480px) {\n  .image-modal {\n    /* Lighter blur on mobile */\n    backdrop-filter: blur(15px);\n    -webkit-backdrop-filter: blur(15px);\n    /* Faster, simpler transition */\n    transform: translateY(20px);\n    transition: transform 0.25s ease-out;\n  }\n  \n  .overlay.active .image-modal {\n    transform: translateY(0);\n  }\n}
 
 .gallery-container {
   display: flex;
@@ -667,9 +663,8 @@ body::before {
   position: relative;
   flex: 1;
   /* Optimize container rendering */
-  contain: layout style paint;
+  contain: layout style;
   isolation: isolate;
-  content-visibility: auto;
 }
 
 .gallery-container:active {
@@ -701,6 +696,10 @@ body::before {
   animation-fill-mode: forwards;
   contain: layout style paint;
   content-visibility: auto;
+  /* Force GPU compositing for ultra-smooth scrolling */
+  will-change: transform;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
 }
 
 @media (max-width: 480px) {
@@ -726,21 +725,27 @@ body::before {
   -webkit-transform: translateZ(0);
   pointer-events: auto;
   contain: layout style paint;
-  /* Use filter instead of box-shadow for better performance */
-  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.08));
-  -webkit-filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.08));
+  /* Optimized shadow for 60fps */
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.06));
+  -webkit-filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.06));
+  /* Optimize image rendering */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 @media (max-width: 480px) {
   .gallery-row img {
-    transition: none !important;
+    height: 195px;
+    width: 146px;
+    transition: none;
     image-rendering: -webkit-optimize-contrast;
     -webkit-user-drag: none;
-    /* Minimal shadow for 60fps */
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
-    -webkit-filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
-    /* Disable pointer events during animation */
-    pointer-events: none;
+    /* Ultra-light shadow for maximum performance */
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.04));
+    -webkit-filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.04));
+    /* Force hardware acceleration */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
   }
 }
 
@@ -751,35 +756,29 @@ body::before {
 }
 
 .row-top {
-  animation: scroll-left 30s linear infinite;
-  /* Ensure smooth animation */
+  animation: scroll-left 35s linear infinite;
   animation-play-state: running;
 }
 
 .row-bottom {
-  animation: scroll-right 30s linear infinite;
+  animation: scroll-right 35s linear infinite;
   animation-play-state: running;
 }
 
-/* Ultra-optimized timing for 60fps like laptop */
+/* Optimized timing for mobile - 22s is perfect for smooth 60fps */
 @media (max-width: 480px) {
   .row-top {
-    animation: scroll-left 18s linear infinite;
+    animation: scroll-left 22s linear infinite;
   }
 
   .row-bottom {
-    animation: scroll-right 18s linear infinite;
-  }
-  
-  /* Pause animations to conserve CPU when not visible */
-  .gallery-row:not(.visible) {
-    animation-play-state: paused;
+    animation: scroll-right 22s linear infinite;
   }
 }
 
 @media (max-width: 768px) and (min-width: 481px) {
   .row-top {
-    animation: scroll-left 25s linear infinite;
+    animation: scroll-left 28s linear infinite;
   }
 
   .row-bottom {
@@ -791,7 +790,6 @@ body::before {
   0% {
     transform: translate3d(0, 0, 0);
   }
-
   100% {
     transform: translate3d(-50%, 0, 0);
   }
@@ -801,7 +799,6 @@ body::before {
   0% {
     transform: translate3d(-50%, 0, 0);
   }
-
   100% {
     transform: translate3d(0, 0, 0);
   }
@@ -1563,4 +1560,3 @@ body::before {
     }
   }
 }
-
